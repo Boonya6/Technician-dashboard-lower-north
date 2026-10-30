@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install Dashboard Lower North - ระบบติดตามงานติดตั้ง & วิเคราะห์แนวโน้ม</title>
+    <!-- Early error catcher: shows script load/parse errors on screen (critical for debugging inside Google Apps Script) -->
+    <script>
+        window.addEventListener("error", function (e) {
+            var target = e.target || {};
+            var msg = (target.tagName === "SCRIPT")
+                ? "โหลดสคริปต์ไม่สำเร็จ: " + (target.src || "inline")
+                : (e.message || "Unknown error") + (e.lineno ? " (บรรทัด " + e.lineno + (e.colno ? ":" + e.colno : "") + ")" : "");
+            var show = function () {
+                var b = document.getElementById("app-fatal-banner");
+                if (!b) {
+                    b = document.createElement("div");
+                    b.id = "app-fatal-banner";
+                    b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:10px 16px;font:13px/1.5 monospace;white-space:pre-wrap";
+                    document.body.appendChild(b);
+                }
+                var line = document.createElement("div");
+                line.textContent = "⚠️ " + msg;
+                b.appendChild(line);
+            };
+            if (document.body) show(); else document.addEventListener("DOMContentLoaded", show);
+        }, true);
+    </script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/static/css/styles.css?v=3.3">
+</head>
+<body class="bg-[#f8fafc] text-slate-800 min-h-screen flex flex-col lg:flex-row">
+
+    <!-- Left Sidebar Menu (เมนูแถบซ้าย: หน้าที่ 1 งานติดตั้ง | หน้าที่ 2 งานซ่อม) -->
+    <aside class="app-sidebar w-full lg:w-60 lg:min-h-screen lg:sticky lg:top-0 z-50 flex flex-col shrink-0 no-print">
+        <!-- Brand Header inside Sidebar -->
+        <div class="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-900/50 shrink-0">
+                    <i data-lucide="layers" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-white leading-tight">Lower North</div>
+                    <div class="text-[11px] text-slate-400">Operations Portal</div>
+                </div>
+            </div>
+            <span id="app-build-badge" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-blue-400 border border-slate-700" title="เวอร์ชันโค้ด (ใช้ตรวจสอบว่า Apps Script Deploy เวอร์ชันล่าสุดแล้ว)">v3.9</span>
+        </div>
+
+        <!-- Main Menu Navigation -->
+        <div class="p-3 space-y-1.5 flex-1">
+            <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                เมนูหลัก (Main Menu)
+            </div>
+
+            <!-- Page 1: งานติดตั้ง -->
+            <button id="sidebar-btn-install" class="sidebar-nav-btn active-install" onclick="switchMainPage('install')">
+                <div class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center mr-3 shrink-0">
+                    <i data-lucide="HardHat" class="w-4 h-4"></i>
+                </div>
+                <div class="text-left flex-1 min-w-0">
+                    <div class="text-sm font-bold leading-tight truncate">งานติดตั้ง</div>
+                    <div class="text-[10px] opacity-80 truncate">Installation Tracking</div>
+                </div>
+                <span id="sidebar-badge-install" class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-white/20 text-white">0</span>
+            </button>
+
+            <!-- Page 2: งานซ่อม -->
+            <button id="sidebar-btn-repair" class="sidebar-nav-btn" onclick="switchMainPage('repair')">
+                <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center mr-3 shrink-0">
+                    <i data-lucide="wrench" class="w-4 h-4"></i>
+                </div>
+                <div class="text-left flex-1 min-w-0">
+                    <div class="text-sm font-bold leading-tight truncate">งานซ่อม</div>
+                    <div class="text-[10px] opacity-80 truncate">Repair & Maintenance</div>
+                </div>
+                <span id="sidebar-badge-repair" class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-800 text-teal-400 border border-slate-700">0</span>
+            </button>
+
+            <!-- Sub-menu for Page 1 (งานติดตั้ง) in Left Sidebar -->
+            <div id="sidebar-install-subnav" class="pt-3 mt-3 border-t border-slate-800/80 space-y-1">
+                <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                    หัวข้อแดชบอร์ดงานติดตั้ง
+                </div>
+                <button id="nav-btn-trend" type="button" onclick="switchInstallTab('trend')" class="sidebar-sub-btn active w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">1</span>
+                    <span class="truncate">สรุปแนวโน้ม & สถิติ</span>
+                </button>
+                <button id="nav-btn-monitor" type="button" onclick="switchInstallTab('monitor')" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">2</span>
+                    <span class="truncate">ติดตามงาน & ข้อมูลช่าง</span>
+                </button>
+                <button id="nav-btn-productivity" type="button" onclick="switchInstallTab('productivity')" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">3</span>
+                    <span class="truncate">วิเคราะห์ผลิตภาพช่าง</span>
+                </button>
+            </div>
+
+            <!-- Sub-menu for Page 2 (งานซ่อม) - แยกเป็นหน้าตามหัวข้อเหมือนงานติดตั้ง -->
+            <div id="sidebar-repair-subnav" class="hidden pt-3 mt-3 border-t border-slate-800/80 space-y-1">
+                <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-teal-400">
+                    หัวข้อแดชบอร์ดงานซ่อม
+                </div>
+                <button id="repair-nav-btn-1" type="button" onclick="switchRepairTab(1)" class="sidebar-sub-btn active-teal w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-teal-500/20 text-teal-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">1</span>
+                    <span class="truncate">งานที่ปิดรายวัน & Status</span>
+                </button>
+                <button id="repair-nav-btn-2" type="button" onclick="switchRepairTab(2)" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-teal-500/20 text-teal-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">2</span>
+                    <span class="truncate">วิเคราะห์ Reason Code</span>
+                </button>
+                <button id="repair-nav-btn-3" type="button" onclick="switchRepairTab(3)" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-teal-500/20 text-teal-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">3</span>
+                    <span class="truncate">Productivity (เกณฑ์ 6 เบอร์)</span>
+                </button>
+                <button id="repair-nav-btn-4" type="button" onclick="switchRepairTab(4)" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-teal-500/20 text-teal-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">4</span>
+                    <span class="truncate">เสียซ้ำใน 30 วัน</span>
+                </button>
+                <button id="repair-nav-btn-5" type="button" onclick="switchRepairTab(5)" class="sidebar-sub-btn w-full flex flex-row items-center whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <span class="sub-num-badge w-4 h-4 rounded bg-teal-500/20 text-teal-400 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">5</span>
+                    <span class="truncate">สถิติรายอำเภอ (งานเยอะ/น้อย)</span>
+                </button>
+                <button id="repair-nav-btn-6" type="button" onclick="switchRepairTab(6)" class="sidebar-sub-btn w-full flex flex-row items-center justify-between whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11.5px] text-slate-300 hover:text-white hover:bg-slate-800/70 transition">
+                    <div class="flex items-center min-w-0">
+                        <span class="sub-num-badge w-4 h-4 rounded bg-rose-500/30 text-rose-300 text-[10px] font-bold inline-flex items-center justify-center mr-2 shrink-0">6</span>
+                        <span class="truncate">แจ้งเตือนป้องกันเสียซ้ำ</span>
+                    </div>
+                    <span id="sidebar-pending-repeat-badge" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white shrink-0">0</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer Info inside Sidebar -->
+        <div class="p-3 border-t border-slate-800 text-[11px] text-slate-400 hidden lg:block">
+            <div class="flex items-center justify-between">
+                <span>พื้นที่อ้างอิง:</span>
+                <span class="text-slate-200 font-semibold">จ.เพชรบูรณ์ (11 อำเภอ)</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Content Wrapper -->
+    <div class="flex-1 min-w-0 flex flex-col min-h-screen">
+
+    <!-- Top Navigation Header matching Reference Mockup -->
+    <header class="top-navbar sticky top-0 z-40">
+        <div class="max-w-[1520px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            
+            <!-- Left: Brand Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div id="header-brand-icon" class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-200 shrink-0">
+                    <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 id="header-main-title" class="text-base font-bold text-slate-900 leading-none">แดชบอร์ดงานติดตั้ง (Install Dashboard Lower North)</h1>
+                    </div>
+                    <div class="flex items-center space-x-1.5 mt-1 text-[11px] text-slate-500">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>อัปเดตล่าสุด:</span>
+                        <span id="header-last-updated" class="font-medium text-slate-700">-</span>
+                        <span class="text-slate-300">•</span>
+                        <span id="header-total-badge" class="font-semibold text-blue-600">(27 งาน)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Action Controls -->
+            <div class="flex items-center space-x-2 text-xs">
+                <!-- Sync Button -->
+                <button id="btn-sync" class="inline-flex items-center px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm shadow-blue-200" title="ซิงค์ข้อมูลล่าสุดจาก Google Sheets โดยไม่รีเซ็ตตัวกรอง">
+                    <i data-lucide="refresh-cw" id="sync-icon" class="w-3.5 h-3.5 mr-1.5"></i>
+                    <span id="sync-status-text">ซิงค์ข้อมูล</span>
+                </button>
+
+                <!-- Export CSV Button -->
+                <button id="btn-export-csv" class="inline-flex items-center px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-medium border border-slate-200 transition shadow-sm">
+                    <i data-lucide="download" class="w-3.5 h-3.5 mr-1.5 text-slate-500"></i>
+                    <span>ส่งออก CSV</span>
+                </button>
+
+                <!-- Settings Button -->
+                <button id="btn-settings" class="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 transition shadow-sm" title="ตั้งค่า Google Sheet URL">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1520px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5 flex-1">
+
+        <!-- ========================================================================= -->
+        <!-- PAGE 1 WRAPPER: งานติดตั้ง (Install Dashboard) -->
+        <!-- ========================================================================= -->
+        <div id="page-install-wrapper" class="space-y-5">
+
+        <!-- Filter Toolbar matching Reference Mockup (2 Rows Card) -->
+        <section class="panel-card p-4">
+            <!-- Row 1: Year, Month, Summary Badges, Reset -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Year Select -->
+                    <div class="flex items-center space-x-1.5">
+                        <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+                        <span class="text-xs font-semibold text-slate-600">เลือกปี:</span>
+                        <select id="filter-year" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm">
+                            <option value="ALL">ปี 2026 (ทั้งหมด)</option>
+                        </select>
+                    </div>
+
+                    <!-- Month Select -->
+                    <div class="flex items-center space-x-1.5">
+                        <i data-lucide="calendar-days" class="w-4 h-4 text-slate-400"></i>
+                        <span class="text-xs font-semibold text-slate-600">เลือกเดือน:</span>
+                        <select id="filter-month" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm">
+                            <option value="ALL">-- ทุกเดือน --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right badges & reset -->
+                <div class="flex items-center space-x-2 text-xs">
+                    <span class="text-slate-500">อิงจาก: <strong class="text-slate-700">วันที่นัดหมาย</strong></span>
+                    <span id="filtered-count-badge" class="px-2.5 py-1 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                        พบ 27 รายการ
+                    </span>
+                    <button id="btn-reset-filters" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition flex items-center space-x-1">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>รีเซ็ตตัวกรอง</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Row 2: Single Date in Month, Status, District, Subdistrict, Team, Event (6 columns grid) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 text-xs">
+                <!-- Single Date in Month Selector -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label id="label-filter-date" class="block text-[11px] font-medium text-slate-500">เลือกวันที่ (ในเดือน)</label>
+                        <span id="date-count-hint" class="text-[10px] text-blue-600 font-semibold"></span>
+                    </div>
+                    <div class="relative flex items-center">
+                        <select id="filter-date" class="w-full pl-2.5 pr-8 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 text-xs cursor-pointer shadow-sm">
+                            <option value="ALL">-- ทุกวันที่ในเดือน --</option>
+                        </select>
+                        <input type="date" id="filter-custom-date" class="sr-only" tabindex="-1">
+                        <button type="button" id="btn-open-calendar" title="เลือกจากปฏิทิน" class="absolute right-2 p-1 text-slate-400 hover:text-blue-600 transition">
+                            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Select -->
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">สถานะงาน</label>
+                    <select id="filter-status" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
+                        <option value="ALL">ทั้งหมด</option>
+                        <option value="Complete">Complete (สำเร็จ)</option>
+                        <option value="Reject">Reject (ไม่ผ่าน)</option>
+                        <option value="Pending">Pending (รอดำเนินการ)</option>
+                    </select>
+                </div>
+
+                <!-- District (อำเภอ) Select -->
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">อำเภอ (District)</label>
+                    <select id="filter-area" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
+                        <option value="ALL">ทุกอำเภอ</option>
+                    </select>
+                </div>
+
+                <!-- Subdistrict (ตำบล) Select -->
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">ตำบล (Subdistrict)</label>
+                    <select id="filter-subdistrict" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
+                        <option value="ALL">ทุกตำบล</option>
+                    </select>
+                </div>
+
+                <!-- Team Select -->
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">ทีมช่างติดตั้ง (TECHNICIAN)</label>
+                    <select id="filter-team" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
+                        <option value="ALL">ทั้งหมด</option>
+                    </select>
+                </div>
+
+                <!-- Service Event Select -->
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">ประเภทบริการ (SERVICE)</label>
+                    <select id="filter-event" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-700">
+                        <option value="ALL">ทั้งหมด</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5 KPI Summary Cards matching Reference Mockup -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            
+            <!-- KPI 1: ยอดรวมงานทั้งหมด -->
+            <div class="kpi-card kpi-card-total">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500">ยอดงานติดตั้งทั้งหมด</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" id="kpi-total-jobs">27</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-slate-400 text-[11px]">งานทั้งหมดที่บันทึก</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">งานทั้งหมด</span>
+                </div>
+            </div>
+
+            <!-- KPI 2: ติดตั้งเรียบร้อย -->
+            <div class="kpi-card kpi-card-complete">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-emerald-700">ติดตั้งเรียบร้อย</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-emerald-600 mt-1" id="kpi-complete-count">19</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-slate-400 text-[11px]">งานที่ปิดสำเร็จ</span>
+                    <span id="kpi-complete-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">70.4% อัตราสำเร็จ</span>
+                </div>
+            </div>
+
+            <!-- KPI 3: รอดำเนินการ / นัดหมาย -->
+            <div class="kpi-card kpi-card-pending">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-amber-700">รอดำเนินการ / นัดหมาย</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-amber-600 mt-1" id="kpi-pending-count">0</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <i data-lucide="hourglass" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-slate-400 text-[11px]">รอผลหน้างาน</span>
+                    <span id="kpi-pending-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">0.0% ของงานทั้งหมด</span>
+                </div>
+            </div>
+
+            <!-- KPI 4: ไม่ผ่าน / ปฏิเสธ -->
+            <div onclick="openRejectCasesModal({ title: 'รายการงานที่ไม่ผ่าน / ปฏิเสธทั้งหมด' })" class="kpi-card kpi-card-cancelled cursor-pointer hover:shadow-md transition group" title="คลิกเพื่อดูรายการงานที่ถูกปฏิเสธ">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-red-700 group-hover:underline">ไม่ผ่าน / ปฏิเสธ</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-red-600 mt-1" id="kpi-failed-count">0</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                        <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-slate-400 text-[11px]">ปฏิเสธ: <span id="kpi-reject-sub">0</span> งาน (คลิกดูข้อมูล)</span>
+                    <span id="kpi-failed-pill" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700">0% ไม่ผ่าน</span>
+                </div>
+            </div>
+
+            <!-- KPI 5: ทีมช่างที่มีผลงาน -->
+            <div class="kpi-card kpi-card-teams">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-purple-700">ผู้รับงาน / ทีมช่าง</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-purple-700 mt-1" id="kpi-active-teams">6</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs">
+                    <span class="text-slate-400 text-[11px]">ทีมช่างที่ได้รับงาน</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">ทีม</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ========================================================================= -->
+        <!-- VIEW 1: หน้าสรุปแนวโน้มและสถิติ (Trend Summary View) - Active by default -->
+        <!-- ========================================================================= -->
+        <div id="view-trend-section" class="space-y-5">
+            
+            <!-- Row 1: Performance Trend Line Chart (Left 2/3) + Status Share Donut (Right 1/3) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left 8 cols: Performance Trend Line Chart -->
+                <div class="lg:col-span-8 panel-card p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="trending-up" class="w-4 h-4 text-blue-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    แนวโน้มการส่งงานและการติดตั้ง (Performance Trend)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                เปรียบเทียบยอดจ่ายให้ช่าง vs ติดตั้งเรียบร้อย vs ปฏิเสธ
+                            </p>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <!-- Team Filter on Trend Chart -->
+                            <select id="trend-team-filter" class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="ALL">-- ทุกทีมช่าง --</option>
+                            </select>
+
+                            <!-- Daily vs Monthly Toggle Buttons -->
+                            <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center">
+                                <button id="btn-toggle-daily" class="time-toggle-btn active">รายวัน</button>
+                                <button id="btn-toggle-monthly" class="time-toggle-btn">รายเดือน</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Line Chart Canvas -->
+                    <div class="relative h-72 sm:h-80">
+                        <canvas id="chart-trend-line"></canvas>
+                    </div>
+                </div>
+
+                <!-- Right 4 cols: Status Share Donut Chart -->
+                <div class="lg:col-span-4 panel-card p-5 flex flex-col">
+                    <div class="mb-2">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                สัดส่วนสถานะงาน (Status Share)
+                            </h3>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">สัดส่วนของสถานะงานทั้งหมด</p>
+                    </div>
+
+                    <!-- Donut Canvas -->
+                    <div class="relative flex-1 min-h-[220px] flex items-center justify-center">
+                        <canvas id="chart-status-donut"></canvas>
+                        <div id="status-donut-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Row 2: By Area Bar Chart (Left 1/2) + Top Technicians (Right 1/2) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left 6 cols: By Area -->
+                <div class="lg:col-span-6 panel-card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    ผลงานแยกตามอำเภอ / พื้นที่ (By District)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">จำนวนงานติดตั้งสำเร็จและสถานะในแต่ละอำเภอ</p>
+                        </div>
+                    </div>
+                    <div class="relative h-64">
+                        <canvas id="chart-area-breakdown"></canvas>
+                    </div>
+                </div>
+
+                <!-- Right 6 cols: Top Technicians Ranking -->
+                <div class="lg:col-span-6 panel-card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="award" class="w-4 h-4 text-amber-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    อันดับผลงานทีมช่าง (Technician Ranking)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">เรียงลำดับตาม % ความสำเร็จ (Complete Rate)</p>
+                        </div>
+                    </div>
+                    <div class="relative h-64">
+                        <canvas id="chart-tech-ranking"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Row 2.5: Reject Reason Code Donut Chart (Left 5 cols) + Top Reject Reasons Breakdown (Right 7 cols) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left 5 cols: Reject Reason Code Donut Chart -->
+                <div class="lg:col-span-5 panel-card p-5 flex flex-col">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="pie-chart" class="w-4 h-4 text-rose-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    สัดส่วนสาเหตุที่ถูกปฏิเสธ (Reject Reason Share)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">เปรียบเทียบหัวข้อ Reason Code ที่ถูก Reject มากที่สุด (Top 7 + อื่นๆ)</p>
+                        </div>
+                        <span id="trend-reject-total-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                            0 เคส
+                        </span>
+                    </div>
+
+                    <!-- Donut Canvas -->
+                    <div class="relative h-56 flex items-center justify-center my-1">
+                        <canvas id="chart-reason-donut-trend"></canvas>
+                        <div id="reason-donut-trend-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Custom Compact Legend for Long Thai Labels -->
+                    <div id="reason-donut-trend-legend" class="mt-2 pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <!-- Right 7 cols: Top Reject Reasons Ranking List -->
+                <div class="lg:col-span-7 panel-card p-5 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    อันดับสาเหตุที่งานถูก Reject สูงสุด (Top Reject Reasons)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">จัดอันดับหัวข้อปัญหาที่ทำให้ติดตั้งไม่สำเร็จ พร้อมสัดส่วนเทียบงาน Reject ทั้งหมด</p>
+                        </div>
+                    </div>
+                    <div id="trend-top-reasons-list" class="space-y-2.5 flex-1 overflow-y-auto max-h-[340px] pr-1">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Row 3: Summary Matrix Table (Daily/Monthly Detailed Table) -->
+            <div class="panel-card p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                            <i data-lucide="table-2" class="w-4 h-4 mr-2 text-blue-600"></i>
+                            ตารางสรุปข้อมูลแนวโน้มการจ่ายงาน (<span id="matrix-mode-label">รายวัน</span>)
+                        </h3>
+                        <p class="text-xs text-slate-500">สรุปจำนวนงานที่จ่ายให้ช่าง ความสำเร็จ และสาเหตุที่พบในแต่ละช่วงเวลา</p>
+                    </div>
+                </div>
+
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th>ช่วงเวลา</th>
+                                <th>จ่ายงานให้ช่าง</th>
+                                <th>ติดตั้งสำเร็จ</th>
+                                <th>% ความสำเร็จ</th>
+                                <th>รอดำเนินการ</th>
+                                <th>ปฏิเสธ</th>
+                                <th>ทีมช่างที่รับงาน</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrix-table-body">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- VIEW 2: หน้าติดตามงาน & ข้อมูลช่าง (Jobs Monitor View) - Hidden by default -->
+        <!-- ========================================================================= -->
+        <div id="view-monitor-section" class="space-y-5 hidden">
+            
+            <!-- Alert Banner: Lowest Completion Team -->
+            <div id="alert-lowest-team" class="bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-start space-x-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 mt-0.5">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-black/20 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">แจ้งเตือนเร่งด่วน</span>
+                            <span class="text-xs text-white/90">ทีมช่างที่มี % ติดตั้งสำเร็จน้อยที่สุด</span>
+                        </div>
+                        <div class="text-lg font-bold mt-0.5 flex flex-wrap items-baseline gap-2">
+                            <span id="lowest-team-name">กำลังคำนวณ...</span>
+                            <span class="text-sm font-semibold bg-white text-red-600 px-2.5 py-0.5 rounded-lg shadow-sm">
+                                สำเร็จเพียง <span id="lowest-team-pct" class="font-extrabold">-</span>
+                            </span>
+                        </div>
+                        <div id="lowest-team-counts" class="text-xs text-white/80 mt-1 font-medium">-</div>
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5" id="lowest-team-reasons"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technician Deep Dive Cards -->
+            <section class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 flex items-center">
+                            <i data-lucide="users" class="w-4 h-4 mr-2 text-blue-600"></i>
+                            วิเคราะห์ประสิทธิภาพทีมช่างรายบุคคล
+                        </h2>
+                        <p class="text-xs text-slate-500">แจกแจงงานสำเร็จ ปฏิเสธ และ Reason Code ประจำตัวของแต่ละช่าง</p>
+                    </div>
+                </div>
+                <div id="technician-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Injected by JS -->
+                </div>
+            </section>
+
+            <!-- Reason Codes Analysis Section (Donut Chart + Detailed List) -->
+            <section class="panel-card p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center">
+                            <i data-lucide="alert-circle" class="w-4 h-4 mr-2 text-red-600"></i>
+                            วิเคราะห์สาเหตุปัญหา (Reason Code Analysis)
+                        </h3>
+                        <p class="text-xs text-slate-500">สัดส่วนหัวข้อ Reason Code ที่ถูก Reject มากที่สุด พร้อมแจกแจงทีมช่างที่พบปัญหา</p>
+                    </div>
+                    <span id="monitor-reject-total-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 self-start sm:self-center">
+                        งานปฏิเสธรวม 0 เคส
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    <!-- Left 5 cols: Donut Chart + Legend -->
+                    <div class="lg:col-span-5 bg-slate-50/70 rounded-2xl p-4 border border-slate-100 flex flex-col">
+                        <div class="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                            <span>สัดส่วนหัวข้อที่ถูก Reject สูงสุด (Top 7 + อื่นๆ)</span>
+                            <span class="text-[11px] font-normal text-slate-400">Donut Chart</span>
+                        </div>
+                        <div class="relative h-56 flex items-center justify-center my-1">
+                            <canvas id="chart-reason-donut-monitor"></canvas>
+                            <div id="reason-donut-monitor-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                        <div id="reason-donut-monitor-legend" class="mt-3 pt-2.5 border-t border-slate-200/70 grid grid-cols-1 gap-1.5 text-xs">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right 7 cols: All Reason Codes Detailed Breakdown -->
+                    <div class="lg:col-span-7 space-y-2.5 max-h-[450px] overflow-y-auto pr-1" id="reasons-analysis-container">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detailed Installation Jobs Table -->
+            <section class="panel-card p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center">
+                            <i data-lucide="table" class="w-4 h-4 mr-2 text-blue-600"></i>
+                            รายการงานติดตั้งทั้งหมด
+                        </h3>
+                        <p class="text-xs text-slate-500" id="table-filtered-count">กำลังโหลด...</p>
+                    </div>
+
+                    <!-- Search Input in Table Section -->
+                    <div class="relative w-full sm:w-72">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="search-input" placeholder="ค้นหาชื่อ, เบอร์โทร, CCID, พื้นที่..." class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th class="w-12">#</th>
+                                <th>วัน-เวลานัดหมาย</th>
+                                <th>CCID / งาน</th>
+                                <th>ทีมช่างติดตั้ง</th>
+                                <th>ลูกค้า & เบอร์โทร</th>
+                                <th>อำเภอ / พื้นที่ (District)</th>
+                                <th>สถานะ</th>
+                                <th>Reason Code / หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <div class="flex items-center space-x-2 text-xs text-slate-500">
+                        <span>แสดง</span>
+                        <select id="select-rows-per-page" class="bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
+                        <span>รายการต่อหน้า</span>
+                    </div>
+                    <div id="pagination-container"></div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- VIEW 3: หน้าวิเคราะห์ผลิตภาพช่าง (Technician Productivity View) -->
+        <!-- ========================================================================= -->
+        <div id="view-productivity-section" class="space-y-5 hidden">
+            
+            <!-- Productivity Header & Criteria Announcement Banner -->
+            <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-blue-700/30">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="flex items-start space-x-3.5">
+                        <div class="w-11 h-11 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center shrink-0 mt-0.5 text-amber-400">
+                            <i data-lucide="zap" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="bg-amber-400/20 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-amber-400/30">
+                                    เกณฑ์วัดผลิตภาพ (Productivity Benchmark)
+                                </span>
+                                <span class="text-xs text-blue-200">ประเมินจากงานที่จ่ายจริงและวันทำงาน</span>
+                            </div>
+                            <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                แดชบอร์ดวิเคราะห์ผลิตภาพการทำงานของแต่ละช่าง (Technician Productivity)
+                            </h2>
+                            <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                วิเคราะห์ว่างานที่จ่ายไป Complete <span class="text-amber-300 font-bold">&gt; 2 งาน/วัน</span> หรือไม่ และคำนวณค่าเฉลี่ยต่อวันทำงานเทียบกับทั้งเดือนว่า <span class="text-emerald-300 font-bold">&gt; 2.5 งาน/วัน</span> (ผ่านเกณฑ์มาตรฐานสูง) หรือ <span class="text-rose-300 font-bold">&le; 2.5 งาน/วัน</span> (ต่ำกว่าเกณฑ์)
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Benchmark Badges -->
+                    <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                        <div class="px-3 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                            <div class="text-[10px] text-blue-200 uppercase font-semibold">เกณฑ์รายวัน</div>
+                            <div class="text-sm font-bold text-amber-300">&gt; 2 งาน/วัน</div>
+                        </div>
+                        <div class="px-3 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                            <div class="text-[10px] text-blue-200 uppercase font-semibold">เกณฑ์เฉลี่ยรายเดือน</div>
+                            <div class="text-sm font-bold text-emerald-300">&gt; 2.5 งาน/วัน</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Productivity KPI Summary Cards (5 Cards) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+                
+                <!-- KPI 1: ช่างที่ผ่านเกณฑ์เฉลี่ย (> 2.5) -->
+                <div class="kpi-card border-l-4 border-l-emerald-500">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-emerald-700">ผ่านเกณฑ์เฉลี่ย (&gt; 2.5)</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-emerald-600 mt-1" id="prod-kpi-above-count">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <i data-lucide="award" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]">เฉลี่ยสำเร็จ &gt; 2.5 งาน/วัน</span>
+                        <span id="prod-kpi-above-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">ผ่านเกณฑ์</span>
+                    </div>
+                </div>
+
+                <!-- KPI 2: ช่างที่ต่ำกว่าเกณฑ์ (<= 2.5) -->
+                <div class="kpi-card border-l-4 border-l-rose-500">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-rose-700">ต่ำกว่าเกณฑ์ (&le; 2.5)</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-rose-600 mt-1" id="prod-kpi-below-count">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]">เฉลี่ยสำเร็จ &le; 2.5 งาน/วัน</span>
+                        <span id="prod-kpi-below-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700">ต้องปรับปรุง</span>
+                    </div>
+                </div>
+
+                <!-- KPI 3: ค่าเฉลี่ยผลงานติดตั้งสำเร็จทั้งทีม -->
+                <div class="kpi-card border-l-4 border-l-blue-500">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-blue-700">ค่าเฉลี่ยสำเร็จทั้งทีม</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-blue-600 mt-1" id="prod-kpi-team-avg">0.00</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <i data-lucide="activity" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]">งานสำเร็จ / วันทำงาน</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">เป้า 2.5</span>
+                    </div>
+                </div>
+
+                <!-- KPI 4: วันทำงานที่ Complete > 2 งาน -->
+                <div class="kpi-card border-l-4 border-l-amber-500">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-amber-700">วันที่มีงานเสร็จ &gt; 2 งาน</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-amber-600 mt-1" id="prod-kpi-days-gt2">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <i data-lucide="check-check" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="prod-kpi-days-gt2-pct">0% ของวันทำงาน</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">ผ่านเกณฑ์รายวัน</span>
+                    </div>
+                </div>
+
+                <!-- KPI 5: วันทำงานจริงรวม -->
+                <div class="kpi-card border-l-4 border-l-purple-500">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-purple-700">วันทำงานจริงรวม (Man-Days)</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-purple-600 mt-1" id="prod-kpi-total-mandays">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                            <i data-lucide="calendar" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="prod-kpi-active-techs">จากทั้งหมด 6 ทีมช่าง</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">วันปฏิบัติงาน</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Row 2: Charts (Left: Productivity Comparison vs 2.5, Right: Daily Target Share Donut) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Left 7 cols: Technician Productivity vs 2.5 Benchmark -->
+                <div class="lg:col-span-7 panel-card p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="bar-chart" class="w-4 h-4 text-blue-600"></i>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                    ผลิตภาพเฉลี่ยรายช่างเทียบกับเป้าหมาย 2.5 งาน/วัน
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                เส้นประสีแดงแสดงเกณฑ์มาตรฐาน 2.5 | <span class="text-emerald-600 font-semibold">สีเขียว = &gt; 2.5</span> | <span class="text-amber-600 font-semibold">สีส้ม/แดง = &le; 2.5</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="relative h-72 sm:h-80">
+                        <canvas id="chart-tech-productivity"></canvas>
+                    </div>
+                </div>
+
+                <!-- Right 5 cols: Daily Target Share Donut Chart -->
+                <div class="lg:col-span-5 panel-card p-5 flex flex-col">
+                    <div class="mb-2">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base">
+                                สัดส่วนวันทำงานที่ปิดงานได้ &gt; 2 งาน
+                            </h3>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">การกระจายตัวของผลงานในแต่ละวันทำงาน (Daily Completion Target)</p>
+                    </div>
+
+                    <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                        <canvas id="chart-daily-target-donut"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Row 3: Technician Productivity Summary Table -->
+            <div class="panel-card p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                            <i data-lucide="table-properties" class="w-4 h-4 mr-2 text-blue-600"></i>
+                            ตารางสรุปผลงานและผลิตภาพช่างแต่ละคน (Technician Productivity Summary)
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            เปรียบเทียบยอดงานสำเร็จ จำนวนวันทำงาน และประเมินค่าเฉลี่ยว่า &gt; 2.5 หรือ &le; 2.5
+                        </p>
+                    </div>
+                </div>
+
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th class="w-10 text-center">#</th>
+                                <th>ทีมช่างติดตั้ง</th>
+                                <th class="text-center">งานที่จ่ายทั้งหมด</th>
+                                <th class="text-center">ติดตั้งสำเร็จ</th>
+                                <th class="text-center">% สำเร็จ</th>
+                                <th class="text-center">วันทำงานจริง</th>
+                                <th class="text-center">วันที่ปิดได้ &gt; 2 งาน</th>
+                                <th class="text-center">วันที่ปิดได้ &le; 2 งาน</th>
+                                <th class="text-center">เฉลี่ยงานสำเร็จ/วัน</th>
+                                <th class="text-center">ผลการประเมิน (เกณฑ์ 2.5)</th>
+                                <th>ระดับผลงานเทียบ 2.5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productivity-table-body">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Row 4: Detailed Daily Operational Log by Technician -->
+            <div class="panel-card p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                            <i data-lucide="calendar-check" class="w-4 h-4 mr-2 text-indigo-600"></i>
+                            บันทึกผลงานรายวันของช่าง (Daily Operational Records)
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            ตรวจสอบผลงานแต่ละวันว่าช่างคนใดปิดงานสำเร็จ &gt; 2 งาน หรือ &le; 2 งาน
+                        </p>
+                    </div>
+
+                    <!-- Daily Log Filter Buttons -->
+                    <div class="flex items-center space-x-1.5 text-xs">
+                        <span class="text-slate-500 font-medium">กรองดู:</span>
+                        <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center">
+                            <button id="btn-filter-daily-all" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-blue-600 shadow-sm">ทั้งหมด</button>
+                            <button id="btn-filter-daily-gt2" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">เฉพาะ &gt; 2 งาน</button>
+                            <button id="btn-filter-daily-lte2" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">เฉพาะ &le; 2 งาน</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th>วันที่นัดหมาย</th>
+                                <th>ทีมช่างติดตั้ง</th>
+                                <th class="text-center">งานที่จ่าย</th>
+                                <th class="text-center">ติดตั้งสำเร็จ</th>
+                                <th class="text-center">ปฏิเสธ</th>
+                                <th class="text-center">ผลลัพธ์รายวัน (&gt; 2 งาน)</th>
+                                <th>อำเภอ / พื้นที่ปฏิบัติงาน</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productivity-daily-body">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        </div><!-- End #page-install-wrapper -->
+
+        <!-- ========================================================================= -->
+        <!-- PAGE 2 WRAPPER: งานซ่อม (Repair & Maintenance Dashboard) -->
+        <!-- ========================================================================= -->
+        <div id="page-repair-wrapper" class="space-y-6 hidden">
+
+            <!-- Repair Filter Toolbar (2 Rows Card) -->
+            <section class="panel-card p-4 border-l-4 border-l-teal-600">
+                <!-- Row 1: Year, Month, Summary Badges, Reset -->
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 flex items-center">
+                            <i data-lucide="wrench" class="w-3.5 h-3.5 mr-1.5 text-teal-600"></i>
+                            ตัวกรองข้อมูลงานซ่อม
+                        </span>
+
+                        <!-- Year Select -->
+                        <div class="flex items-center space-x-1.5">
+                            <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+                            <span class="text-xs font-semibold text-slate-600">เลือกปี:</span>
+                            <select id="repair-filter-year" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer shadow-sm">
+                                <option value="ALL">ทุกปี</option>
+                            </select>
+                        </div>
+
+                        <!-- Month Select -->
+                        <div class="flex items-center space-x-1.5">
+                            <i data-lucide="calendar-days" class="w-4 h-4 text-slate-400"></i>
+                            <span class="text-xs font-semibold text-slate-600">เลือกเดือน:</span>
+                            <select id="repair-filter-month" class="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer shadow-sm">
+                                <option value="ALL">-- ทุกเดือน --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Right badges & reset -->
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="text-slate-500">อ้างอิงพื้นที่: <strong class="text-teal-700">11 อำเภอ จ.เพชรบูรณ์ (สลับ อ.-ต. อัตโนมัติ)</strong></span>
+                        <span id="repair-filtered-count-badge" class="px-2.5 py-1 rounded-full font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                            พบ 0 รายการ
+                        </span>
+                        <button id="repair-btn-reset-filters" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition flex items-center space-x-1">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                            <span>รีเซ็ตตัวกรอง</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Row 2: Date, Status, Status การซ่อม, District (อำเภอ), Subdistrict (ตำบล), Team (ทีมช่าง) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 text-xs">
+                    <!-- Date Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">วันที่นัดหมาย (Appoint Date)</label>
+                        <select id="repair-filter-date" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">-- ทุกวันที่ --</option>
+                        </select>
+                    </div>
+
+                    <!-- Status Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Status (สถานะใบงาน)</label>
+                        <select id="repair-filter-status" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">ทั้งหมด</option>
+                            <option value="Complete">Complete (ซ่อมสำเร็จ)</option>
+                            <option value="Retrun">Retrun (คืนงาน/เลื่อนนัด)</option>
+                            <option value="Cencel">Cencel (ยกเลิก)</option>
+                            <option value="Pending">รอดำเนินการ (ยังไม่ระบุ)</option>
+                        </select>
+                    </div>
+
+                    <!-- Status การซ่อม Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">Status การซ่อม</label>
+                        <select id="repair-filter-action" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">ทั้งหมด</option>
+                            <option value="เข้าซ่อม">เข้าซ่อม</option>
+                            <option value="ไม่เข้าซ่อม">ไม่เข้าซ่อม</option>
+                            <option value="รอดำเนินการ">รอดำเนินการ</option>
+                        </select>
+                    </div>
+
+                    <!-- District (อำเภอ) Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">อำเภอ (หน้า -)</label>
+                        <select id="repair-filter-district" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">ทุกอำเภอ</option>
+                        </select>
+                    </div>
+
+                    <!-- Subdistrict (ตำบล) Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">ตำบล (หลัง -)</label>
+                        <select id="repair-filter-subdistrict" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">ทุกตำบล</option>
+                        </select>
+                    </div>
+
+                    <!-- Repair Team Select -->
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-1">ทีมช่างซ่อม (ทีมช่าง)</label>
+                        <select id="repair-filter-team" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-700">
+                            <option value="ALL">ทุกทีมช่าง</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5 Repair KPI Summary Cards -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                <!-- KPI 1: งานซ่อมทั้งหมด -->
+                <div class="kpi-card kpi-card-total">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500">งานซ่อมทั้งหมด</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1" id="repair-kpi-total">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <i data-lucide="wrench" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="repair-kpi-pending-sub">รอดำเนินการ 0 งาน</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">ใบงานทั้งหมด</span>
+                    </div>
+                </div>
+
+                <!-- KPI 2: ปิดงาน Complete & เข้าซ่อม -->
+                <div class="kpi-card kpi-card-complete">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-emerald-700">Complete / เข้าซ่อมจริง</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-emerald-600 mt-1" id="repair-kpi-complete">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="repair-kpi-action-in-sub">เข้าซ่อม: 0 เบอร์</span>
+                        <span id="repair-kpi-complete-pct" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">0% สำเร็จ</span>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Retrun / Cencel / ไม่เข้าซ่อม -->
+                <div class="kpi-card kpi-card-pending">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-amber-700">Retrun / Cencel / ไม่เข้าซ่อม</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-amber-600 mt-1" id="repair-kpi-not-in">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="repair-kpi-retrun-cancel-sub">Retrun 0 | Cencel 0</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700">ไม่เข้าซ่อม</span>
+                    </div>
+                </div>
+
+                <!-- KPI 4: Productivity เฉลี่ยเข้าซ่อม/วัน (เกณฑ์ 6 เบอร์/วัน) -->
+                <div class="kpi-card kpi-card-teams">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-purple-700">เฉลี่ยเข้าซ่อม / วันทำงาน</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-purple-700 mt-1" id="repair-kpi-avg-prod">0.00</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="repair-kpi-pass-days-sub">ผ่านเกณฑ์ &ge;6 เบอร์: 0 วัน</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700">เกณฑ์ 6 เบอร์/วัน</span>
+                    </div>
+                </div>
+
+                <!-- KPI 5: แจ้งเสียซ้ำใน 30 วัน (หลัง Complete + เข้าซ่อม) -->
+                <div class="kpi-card kpi-card-cancelled">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-rose-700">แจ้งเสียซ้ำใน 30 วัน</p>
+                            <h3 class="text-2xl sm:text-3xl font-black text-rose-600 mt-1" id="repair-kpi-repeat-30d">0</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <i data-lucide="repeat" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                        <span class="text-slate-400 text-[11px]" id="repair-kpi-repeat-sub">นับเฉพาะหลัง Complete+เข้าซ่อม</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700">Rework 30 วัน</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 1 (Active by default): งานที่ปิดแต่ละวันแบ่งออกเป็นหัวข้อของ Status และ Status การซ่อม -->
+            <!-- ========================================================================= -->
+            <div id="repair-sec-1" class="space-y-4">
+                <!-- Section 1 Dark Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 mt-0.5 font-black text-teal-300">
+                                1
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-teal-400/20 text-teal-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-teal-400/30">
+                                        Daily Closed Jobs & Status
+                                    </span>
+                                    <span class="text-xs text-teal-200">สรุปสถานะใบงานและการเข้าซ่อมรายวัน</span>
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                    งานที่ปิดแต่ละวัน แบ่งตามหัวข้อ Status และ Status การซ่อม
+                                </h2>
+                                <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    แสดงยอดงานรายวันแยกตาม <span class="text-amber-300 font-bold">Status</span> (Complete, Retrun, Cencel, รอดำเนินการ) ควบคู่กับ <span class="text-emerald-300 font-bold">Status การซ่อม</span> (เข้าซ่อม, ไม่เข้าซ่อม)
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">สถานะใบงาน</div>
+                                <div class="text-sm font-bold text-amber-300">Complete / Retrun / Cencel</div>
+                            </div>
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">สถานะปฏิบัติงาน</div>
+                                <div class="text-sm font-bold text-emerald-300">เข้าซ่อม / ไม่เข้าซ่อม</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            <section class="panel-card p-5 space-y-5">
+
+                <!-- Charts Row: Left 6 cols Daily Stacked Bar, Mid 3 cols Status Donut, Right 3 cols Repair Action Donut -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    <div class="lg:col-span-6 bg-slate-50/60 rounded-2xl p-4 border border-slate-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-800 flex items-center">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4 mr-1.5 text-teal-600"></i>
+                                แนวโน้มงานแต่ละวันแยกตาม Status (Daily Status Breakdown)
+                            </span>
+                        </div>
+                        <div class="relative h-64">
+                            <canvas id="chart-repair-daily-status"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-3 bg-slate-50/60 rounded-2xl p-4 border border-slate-100 flex flex-col">
+                        <div class="text-xs font-bold text-slate-800 mb-1">สัดส่วน Status ใบงาน</div>
+                        <p class="text-[11px] text-slate-500 mb-2">Complete / Retrun / Cencel / รอดำเนินการ</p>
+                        <div class="relative flex-1 min-h-[190px] flex items-center justify-center">
+                            <canvas id="chart-repair-status-donut"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-3 bg-slate-50/60 rounded-2xl p-4 border border-slate-100 flex flex-col">
+                        <div class="text-xs font-bold text-slate-800 mb-1">สัดส่วน Status การซ่อม</div>
+                        <p class="text-[11px] text-slate-500 mb-2">เข้าซ่อม vs ไม่เข้าซ่อม vs รอดำเนินการ</p>
+                        <div class="relative flex-1 min-h-[190px] flex items-center justify-center">
+                            <canvas id="chart-repair-action-donut"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Matrix Table -->
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th>วันที่นัดหมาย (Appoint Date)</th>
+                                <th class="text-center">งานทั้งหมด</th>
+                                <th class="text-center text-emerald-700">Complete</th>
+                                <th class="text-center text-amber-700">Retrun</th>
+                                <th class="text-center text-rose-700">Cencel</th>
+                                <th class="text-center text-slate-500">รอดำเนินการ</th>
+                                <th class="text-center bg-teal-50/80 text-teal-800">เข้าซ่อม (เบอร์)</th>
+                                <th class="text-center bg-slate-100 text-slate-700">ไม่เข้าซ่อม</th>
+                                <th class="text-center">% ปิดงาน (Complete)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repair-daily-status-tbody">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ตารางรายการงานซ่อมทั้งหมด (All Repair Jobs Table inside View 1) -->
+            <section class="panel-card p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center">
+                            <i data-lucide="table" class="w-4 h-4 mr-2 text-teal-600"></i>
+                            รายการใบงานซ่อมทั้งหมด (Repair Jobs Directory)
+                        </h3>
+                        <p class="text-xs text-slate-500" id="repair-table-filtered-count">กำลังโหลดข้อมูลงานซ่อม...</p>
+                    </div>
+
+                    <div class="relative w-full sm:w-80">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                        <input type="text" id="repair-search-input" placeholder="ค้นหา CCID, อำเภอ, ตำบล, ทีมช่าง, สาเหตุ..." class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="table-container border border-slate-200 bg-white">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th class="w-12">No.</th>
+                                <th>วัน-เวลานัดหมาย</th>
+                                <th>เบอร์วงจร (CCID)</th>
+                                <th>อำเภอ - ตำบล (จัดเรียงแล้ว)</th>
+                                <th>ทีมช่าง / Field Service</th>
+                                <th>Status</th>
+                                <th>Status การซ่อม</th>
+                                <th>Reason Code / หมายเหตุ (Remark)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repair-jobs-table-body">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <div class="flex items-center space-x-2 text-xs text-slate-500">
+                        <span>แสดง</span>
+                        <select id="repair-select-rows-per-page" class="bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none">
+                            <option value="15" selected>15</option>
+                            <option value="30">30</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span>รายการต่อหน้า</span>
+                    </div>
+                    <div id="repair-pagination-container"></div>
+                </div>
+            </section>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 2 (Hidden by default): แบ่งหัวข้อ Reason Code -->
+            <!-- ========================================================================= -->
+            <section id="repair-sec-2" class="space-y-4 hidden">
+                <!-- Section 2 Dark Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 mt-0.5 font-black text-teal-300">
+                                2
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-teal-400/20 text-teal-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-teal-400/30">
+                                        Reason Code Breakdown
+                                    </span>
+                                    <span class="text-xs text-teal-200">วิเคราะห์สาเหตุเสียและสาเหตุคืนงาน</span>
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                    วิเคราะห์และแบ่งหัวข้อสาเหตุงานซ่อม (Reason Code)
+                                </h2>
+                                <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    จัดอันดับหัวข้อสาเหตุเสีย / สาเหตุคืนงาน พร้อมแยกจำนวนเคสที่ <span class="text-emerald-300 font-bold">เข้าซ่อม</span> และ <span class="text-amber-300 font-bold">ไม่เข้าซ่อม</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">จำนวนที่ระบุสาเหตุ</div>
+                                <div id="repair-reason-total-badge" class="text-sm font-bold text-amber-300">ระบุสาเหตุ 0 เคส</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card p-5">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    <!-- Left 5 cols: Reason Code Donut & Legend -->
+                    <div class="lg:col-span-5 bg-slate-50/70 rounded-2xl p-4 border border-slate-100 flex flex-col">
+                        <div class="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                            <span>สัดส่วนหัวข้อ Reason Code สูงสุด (Top 7 + อื่นๆ)</span>
+                            <span class="text-[11px] font-normal text-slate-400">Donut Chart</span>
+                        </div>
+                        <div class="relative h-60 flex items-center justify-center my-1">
+                            <canvas id="chart-repair-reason-donut"></canvas>
+                        </div>
+                        <div id="repair-reason-legend" class="mt-3 pt-2.5 border-t border-slate-200/70 grid grid-cols-1 gap-1.5 text-xs">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right 7 cols: Ranked Reason Code Table / Cards -->
+                    <div class="lg:col-span-7 space-y-2.5 max-h-[460px] overflow-y-auto pr-1" id="repair-reason-list-container">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 3 (Hidden by default): วิเคราะห์ Productivity ของทีมซ่อม (เกณฑ์ 6 เบอร์/วัน นับจาก Status การซ่อม = เข้าซ่อม) -->
+            <!-- ========================================================================= -->
+            <section id="repair-sec-3" class="space-y-4 hidden">
+                <!-- Productivity Criteria Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 mt-0.5 font-black text-teal-300">
+                                3
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-teal-400/20 text-teal-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-teal-400/30">
+                                        Repair Team Productivity
+                                    </span>
+                                    <span class="text-xs text-teal-200">นับจากคอลัมน์ Status การซ่อม = "เข้าซ่อม"</span>
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                    วิเคราะห์ Productivity ของทีมซ่อม (เกณฑ์มาตรฐาน 6 เบอร์/วัน)
+                                </h2>
+                                <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    ประเมินประสิทธิภาพทีมช่างซ่อมจากจำนวนเบอร์ที่ <span class="text-emerald-300 font-bold">เข้าซ่อมจริง</span> ในแต่ละวันเทียบกับเกณฑ์ <span class="text-amber-300 font-bold">&ge; 6 เบอร์/วัน</span> (ผ่านเกณฑ์) และ <span class="text-rose-300 font-bold">&lt; 6 เบอร์/วัน</span> (ต่ำกว่าเกณฑ์)
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">เกณฑ์ทีมซ่อม</div>
+                                <div class="text-sm font-bold text-amber-300">&ge; 6 เบอร์/วัน</div>
+                            </div>
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">ตัวชี้วัด</div>
+                                <div class="text-sm font-bold text-emerald-300">Status การซ่อม = เข้าซ่อม</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Productivity Chart + Team Summary Table -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    <div class="lg:col-span-5 panel-card p-5 flex flex-col">
+                        <div class="mb-3">
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                                <i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-teal-600"></i>
+                                ค่าเฉลี่ย "เข้าซ่อม/วัน" รายทีมช่าง เทียบเกณฑ์ 6 เบอร์/วัน
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">เส้นประสีแดงแสดงเกณฑ์เป้าหมาย 6 เบอร์ต่อวันทำงาน</p>
+                        </div>
+                        <div class="relative flex-1 min-h-[260px]">
+                            <canvas id="chart-repair-productivity"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-7 panel-card p-5">
+                        <div class="mb-3">
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                                <i data-lucide="users" class="w-4 h-4 mr-2 text-teal-600"></i>
+                                ตารางสรุป Productivity ทีมช่างซ่อม (Team Productivity Summary)
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">เปรียบเทียบยอดงานทั้งหมด ยอดเข้าซ่อมจริง วันทำงาน และค่าเฉลี่ยต่อวัน</p>
+                        </div>
+                        <div class="table-container border border-slate-200 bg-white">
+                            <table class="w-full text-left custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>ทีมช่าง (Field Service)</th>
+                                        <th class="text-center">งานทั้งหมด</th>
+                                        <th class="text-center bg-emerald-50 text-emerald-800">เข้าซ่อม (เบอร์)</th>
+                                        <th class="text-center">ไม่เข้าซ่อม</th>
+                                        <th class="text-center">Complete</th>
+                                        <th class="text-center">วันทำงาน</th>
+                                        <th class="text-center">วันที่ &ge; 6 เบอร์</th>
+                                        <th class="text-center">เฉลี่ยเข้าซ่อม/วัน</th>
+                                        <th class="text-center">ประเมิน (เกณฑ์ 6)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="repair-prod-team-tbody">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Productivity Log for Repair Teams -->
+                <div class="panel-card p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                                <i data-lucide="calendar-check" class="w-4 h-4 mr-2 text-teal-600"></i>
+                                บันทึกผลงานเข้าซ่อมรายวันของแต่ละทีมช่าง (Daily Repair Productivity Log)
+                            </h3>
+                            <p class="text-xs text-slate-500">ตรวจสอบรายวันว่าทีมช่างใดเข้าซ่อมได้ตามเกณฑ์ &ge; 6 เบอร์/วัน หรือไม่</p>
+                        </div>
+                        <div class="flex items-center space-x-1.5 text-xs">
+                            <span class="text-slate-500 font-medium">กรองดู:</span>
+                            <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex flex-wrap items-center">
+                                <button id="repair-btn-daily-all" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-teal-700 shadow-sm">ทั้งหมด</button>
+                                <button id="repair-btn-daily-pass" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">ผ่านเกณฑ์ (&ge; 6 เบอร์)</button>
+                                <button id="repair-btn-daily-low" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">งานน้อย (รับงาน &lt; 6)</button>
+                                <button id="repair-btn-daily-fail" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">ต่ำกว่าเกณฑ์ (รับงาน &ge; 6)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container border border-slate-200 bg-white">
+                        <table class="w-full text-left custom-table">
+                            <thead>
+                                <tr>
+                                    <th>วันที่นัดหมาย</th>
+                                    <th>ทีมช่าง</th>
+                                    <th class="text-center">ใบงานที่ได้รับ</th>
+                                    <th class="text-center bg-emerald-50 text-emerald-800">เข้าซ่อมจริง (เบอร์)</th>
+                                    <th class="text-center">ไม่เข้าซ่อม</th>
+                                    <th class="text-center">Complete</th>
+                                    <th class="text-center">ผลประเมิน (เกณฑ์ 6 เบอร์/วัน)</th>
+                                    <th>Remark (หมายเหตุ)</th>
+                                    <th>พื้นที่ปฏิบัติงาน (อำเภอ)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repair-prod-daily-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 4 (Hidden by default): เบอร์ที่แจ้งเสียซ้ำมาใน 30 วัน นับจากวันที่แจ้งเสียครั้งแรก (Complete + เข้าซ่อม) -->
+            <!-- ========================================================================= -->
+            <section id="repair-sec-4" class="space-y-4 hidden">
+                <!-- Section 4 Dark Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 mt-0.5 font-black text-teal-300">
+                                4
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-teal-400/20 text-teal-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-teal-400/30">
+                                        30-Day Repeat Faults (Rework)
+                                    </span>
+                                    <span id="repair-repeat-count-pill" class="text-xs font-bold text-amber-300">0 เบอร์</span>
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                    เบอร์ (CCID) ที่แจ้งเสียซ้ำภายใน 30 วัน นับจากวันที่แจ้งเสียครั้งแรก
+                                </h2>
+                                <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    เงื่อนไข: งานครั้งแรกต้องซ่อมเสร็จแล้ว (<span class="text-emerald-300 font-bold">Status = Complete</span> + <span class="text-amber-300 font-bold">Status การซ่อม = เข้าซ่อม</span>) แล้วมีใบงานแจ้งเสียซ้ำเข้ามาใหม่ภายใน 30 วัน
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">เกณฑ์นับเสียซ้ำ</div>
+                                <div class="text-sm font-bold text-amber-300">ภายใน 30 วัน</div>
+                            </div>
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">เงื่อนไขงานแรก</div>
+                                <div class="text-sm font-bold text-emerald-300">Complete + เข้าซ่อม</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card p-5 space-y-4">
+                    <!-- Mode Toggle -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                        <span class="text-xs font-bold text-slate-700">เลือกรูปแบบการแสดงผลรายการเบอร์ซ้ำ:</span>
+                        <div class="bg-slate-100 p-0.5 rounded-lg border border-slate-200 flex items-center self-start sm:self-auto">
+                            <button id="repair-btn-repeat-strict" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-rose-600 shadow-sm">
+                                เฉพาะซ่อมเสร็จแล้วเสียซ้ำ (Complete + เข้าซ่อม)
+                            </button>
+                            <button id="repair-btn-repeat-all" class="px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">
+                                ดูเบอร์ซ้ำทุกสถานะ (รวมเลื่อนนัด/รอซ่อม)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary by Technician Cards for Repeat Faults -->
+                    <div id="repair-repeat-tech-summary" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <!-- Injected by JS -->
+                    </div>
+
+                    <!-- Repeat Faults Detailed Table -->
+                    <div class="table-container border border-slate-200 bg-white">
+                        <table class="w-full text-left custom-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-10">#</th>
+                                    <th>เบอร์วงจร (CCID)</th>
+                                    <th>พื้นที่ (อำเภอ - ตำบล)</th>
+                                    <th>แจ้งเสียครั้งแรก (ซ่อมเสร็จ)</th>
+                                    <th>ช่างผู้ซ่อมครั้งแรก</th>
+                                    <th>สาเหตุ/ผลซ่อมครั้งแรก</th>
+                                    <th>วันที่แจ้งเสียซ้ำ</th>
+                                    <th class="text-center">ระยะห่าง (วัน)</th>
+                                    <th>ช่างผู้รับงานครั้งที่ซ้ำ</th>
+                                    <th>สาเหตุ / สถานะครั้งที่ซ้ำ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repair-repeat-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 5 (Hidden by default): สถิติงานซ่อมแยกตามพื้นที่ -->
+            <!-- ========================================================================= -->
+            <section id="repair-sec-5" class="space-y-4 hidden">
+                <!-- Section 5 Dark Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-center space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 font-black text-teal-300">
+                                5
+                            </div>
+                            <div>
+                                <h2 class="text-lg sm:text-xl font-black text-white">
+                                    สถิติงานซ่อมแยกตามพื้นที่
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card p-5 space-y-5">
+
+                <!-- District Bar Chart + District Summary Cards -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    <div class="lg:col-span-6 bg-slate-50/60 rounded-2xl p-4 border border-slate-100">
+                        <div class="text-xs font-bold text-slate-800 mb-2 flex items-center">
+                            <i data-lucide="map-pin" class="w-4 h-4 mr-1.5 text-teal-600"></i>
+                            จำนวนงานซ่อมแยกตามอำเภอ (By District)
+                        </div>
+                        <div class="relative h-72">
+                            <canvas id="chart-repair-area-district"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-6 bg-slate-50/60 rounded-2xl p-4 border border-slate-100 flex flex-col">
+                        <div class="text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
+                            <span>สรุปยอดรวมรายอำเภอ (11 อำเภอ จ.เพชรบูรณ์)</span>
+                            <span class="text-[11px] font-normal text-slate-500">คลิกที่อำเภอเพื่อกรองดูตำบล</span>
+                        </div>
+                        <div id="repair-district-summary-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 overflow-y-auto max-h-72 pr-1">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- District Ranking Table (ตารางเปรียบเทียบปริมาณงานซ่อมแต่ละอำเภอ: งานเยอะ vs งานน้อย) -->
+                <div>
+                    <div class="text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
+                        <span class="flex items-center">
+                            <i data-lucide="bar-chart-horizontal" class="w-4 h-4 mr-1.5 text-teal-600"></i>
+                            ตารางจัดอันดับปริมาณงานซ่อมแต่ละอำเภอ (ดูว่าอำเภอไหนงานเยอะหรือน้อย)
+                        </span>
+                        <span class="text-[11px] font-normal text-slate-500">เรียงลำดับจากปริมาณงานมากไปน้อย</span>
+                    </div>
+                    <div class="table-container border border-slate-200 bg-white">
+                        <table class="w-full text-left custom-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-12 text-center">อันดับ</th>
+                                    <th>อำเภอ</th>
+                                    <th class="text-center">จำนวนตำบลที่มีงาน</th>
+                                    <th class="text-center">งานซ่อมทั้งหมด</th>
+                                    <th class="text-center">ระดับปริมาณงาน</th>
+                                    <th class="text-center text-emerald-700">Complete</th>
+                                    <th class="text-center text-amber-700">Retrun</th>
+                                    <th class="text-center text-rose-700">Cencel</th>
+                                    <th class="text-center text-slate-500">รอดำเนินการ</th>
+                                    <th class="text-center bg-teal-50/80 text-teal-800">เข้าซ่อม</th>
+                                    <th class="text-center">ไม่เข้าซ่อม</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repair-district-ranking-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Detailed District & Subdistrict Table -->
+                <div>
+                    <div class="text-xs font-bold text-slate-800 mb-2 flex items-center">
+                        <i data-lucide="list-tree" class="w-4 h-4 mr-1.5 text-teal-600"></i>
+                        รายละเอียดงานซ่อมแยกตาม อำเภอ - ตำบล
+                    </div>
+                    <div class="table-container border border-slate-200 bg-white">
+                        <table class="w-full text-left custom-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-10">#</th>
+                                    <th>อำเภอ (หน้า -)</th>
+                                    <th>ตำบล (หลัง -)</th>
+                                    <th>รูปแบบมาตรฐาน (อำเภอ - ตำบล)</th>
+                                    <th class="text-center">งานทั้งหมด</th>
+                                    <th class="text-center text-emerald-700">Complete</th>
+                                    <th class="text-center text-amber-700">Retrun</th>
+                                    <th class="text-center text-rose-700">Cencel</th>
+                                    <th class="text-center text-slate-500">รอดำเนินการ</th>
+                                    <th class="text-center bg-teal-50/80 text-teal-800">เข้าซ่อม</th>
+                                    <th class="text-center">ไม่เข้าซ่อม</th>
+                                    <th class="text-center">% ปิดงาน Complete</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repair-area-table-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- หัวข้อที่ 6 (Hidden by default): แจ้งเตือนเบอร์ "รอดำเนินการ" ที่แจ้งเสียซ้ำ (นับทุกสถานะ) พร้อมแนะนำวิธีปิดงาน -->
+            <!-- ========================================================================= -->
+            <section id="repair-sec-6" class="space-y-4 hidden">
+                <!-- Section 6 Dark Banner -->
+                <div class="bg-gradient-to-r from-teal-900 via-slate-900 to-emerald-950 rounded-2xl p-5 text-white shadow-lg border border-teal-700/30">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-teal-400/20 border border-teal-400/30 flex items-center justify-center shrink-0 mt-0.5 font-black text-teal-300">
+                                6
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-rose-500/25 text-rose-300 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border border-rose-400/30">
+                                        KPI Protection & Repeat Alert
+                                    </span>
+                                    <span id="repair-sec6-alert-pill" class="text-xs font-bold text-amber-300">พบ 0 เบอร์เฝ้าระวัง</span>
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white mt-1">
+                                    แจ้งเตือนเบอร์สถานะ "รอดำเนินการ" ที่แจ้งเสียมาซ้ำ (ไม่นับเลื่อนนัดหมาย) & แนะนำวิธีปิดงาน
+                                </h2>
+                                <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    ตรวจสอบเบอร์ที่ยังค้างสถานะ <span class="text-amber-300 font-bold">รอดำเนินการ</span> และเคยมีประวัติแจ้งเสียมาก่อนหน้าภายใน 30 วัน (นับทุกสถานะ ยกเว้น <span class="text-rose-300 font-bold">Reason Code = เลื่อนนัดหมาย</span> ไม่นำมานับ) พร้อมแนวทางปิดใบงานเพื่อไม่ให้ตก KPI แจ้งเสียซ้ำ 30 วัน
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                            <div class="px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                                <div class="text-[10px] text-teal-200 uppercase font-semibold">กรณีงานแรก Complete+เข้าซ่อม</div>
+                                <div class="text-sm font-bold text-amber-300">ปิด Status = Cencel / Retrun เท่านั้น</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Guideline Banner Card -->
+                <div class="panel-card p-5 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50/70 via-white to-rose-50/40">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                        </div>
+                        <div class="space-y-1.5 text-xs">
+                            <div class="font-bold text-slate-900 text-sm">
+                                คำแนะนำวิธีปิดงาน เพื่อไม่ให้เบอร์ไปอยู่ในการแจ้งเสียซ้ำ 30 วัน (KPI Protection Guide)
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+                                    <div class="font-bold text-rose-800 flex items-center">
+                                        <i data-lucide="alert-octagon" class="w-4 h-4 mr-1.5 text-rose-600"></i>
+                                        กรณีที่ 1: ใบงานแรกปิดเป็น Complete + เข้าซ่อม ไปแล้ว (ไม่ใช่เลื่อนนัดหมาย)
+                                    </div>
+                                    <p class="text-rose-700 mt-1 leading-relaxed">
+                                        <strong>วิธีปิดงานที่ถูกต้อง:</strong> ให้ปิดใบงานที่ซ้ำนี้เป็น <strong><code class="px-1.5 py-0.5 bg-white rounded border border-rose-300 text-rose-900">Status = Cencel</code> หรือ <code class="px-1.5 py-0.5 bg-white rounded border border-rose-300 text-rose-900">Retrun</code> เท่านั้น</strong> (ห้ามปิดเป็น Complete + เข้าซ่อม ซ้ำ เพราะจะทำให้เบอร์นี้ตก KPI เสียซ้ำ 30 วันทันที)
+                                    </p>
+                                </div>
+                                <div class="p-3 rounded-xl bg-teal-50 border border-teal-200">
+                                    <div class="font-bold text-teal-900 flex items-center">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 mr-1.5 text-teal-600"></i>
+                                        กรณีที่ 2: ใบงานก่อนหน้าเป็น เลื่อนนัดหมาย / Retrun / ไม่เข้าซ่อม
+                                    </div>
+                                    <p class="text-teal-800 mt-1 leading-relaxed">
+                                        <strong>วิธีปิดงานที่ถูกต้อง:</strong> เนื่องจากใบงานก่อนหน้ายังไม่ได้ถูกนับเป็นซ่อมเสร็จ (ไม่ใช่ Complete+เข้าซ่อม) จึงสามารถเข้าซ่อมและปิดใบงานปัจจุบันเป็น <strong><code class="px-1.5 py-0.5 bg-white rounded border border-teal-300 text-teal-900">Complete + เข้าซ่อม</code></strong> ได้โดยไม่ติด KPI เสียซ้ำ (หรือหากใบงานก่อนหน้าเผลอลง Complete+เข้าซ่อม แต่เป็นเลื่อนนัดหมาย ต้องระบุ Reason Code = เลื่อนนัดหมาย ให้ชัดเจน)
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Repeat Tickets Table -->
+                <div class="panel-card p-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm sm:text-base flex items-center">
+                                <i data-lucide="bell-ring" class="w-4 h-4 mr-2 text-rose-600"></i>
+                                รายการเบอร์ที่อยู่ในสถานะ "รอดำเนินการ" และมีประวัติแจ้งเสียซ้ำใน 30 วัน (ไม่นับ Reason Code = เลื่อนนัดหมาย)
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">ตรวจสอบประวัติใบงานก่อนหน้าและคำแนะนำวิธีปิดใบงานรายเบอร์ (กรณีใบงานก่อนหน้าเป็น เลื่อนนัดหมาย จะไม่ถูกนำมานับ)</p>
+                        </div>
+                    </div>
+
+                    <div class="table-container border border-slate-200 bg-white">
+                        <table class="w-full text-left custom-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-10">#</th>
+                                    <th>เบอร์วงจร (CCID)</th>
+                                    <th>พื้นที่ (อำเภอ - ตำบล)</th>
+                                    <th>ใบงานปัจจุบัน (รอดำเนินการ)</th>
+                                    <th>ทีมช่างผู้รับผิดชอบปัจจุบัน</th>
+                                    <th>ประวัติใบงานก่อนหน้า (ภายใน 30 วัน)</th>
+                                    <th class="text-center">ห่างกัน (วัน)</th>
+                                    <th>ระดับความเสี่ยง KPI</th>
+                                    <th class="min-w-[280px]">คำแนะนำวิธีปิดงาน (ไม่ให้ติดเสียซ้ำ 30 วัน)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repair-pending-repeat-tbody">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div><!-- End #page-repair-wrapper -->
+
+    </main>
+    </div><!-- End Right Content Wrapper -->
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-base flex items-center">
+                    <i data-lucide="settings" class="w-5 h-5 mr-2 text-blue-600"></i>
+                    ตั้งค่าแหล่งข้อมูล (Data Source Settings)
+                </h3>
+                <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Google Sheet CSV Export URL:</label>
+                    <input type="text" id="input-sheet-url" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        รองรับลิงก์ Google Sheet ในรูปแบบ CSV Export
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                    ยกเลิก
+                </button>
+                <button id="btn-save-settings" class="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-100">
+                    บันทึกและซิงค์ใหม่
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reason Code Detail Popup Modal -->
+    <div id="reason-detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center hidden p-2 sm:p-4">
+        <div class="bg-white rounded-2xl max-w-[96vw] xl:max-w-[1480px] w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="px-5 py-4 bg-gradient-to-r from-rose-50 via-white to-slate-50 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
+                <div class="flex items-start space-x-3 min-w-0">
+                    <div id="reason-modal-rank-badge" class="w-9 h-9 rounded-xl bg-rose-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                        #1
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-100 text-rose-700">
+                                รายละเอียดสาเหตุปัญหา (Reason Code)
+                            </span>
+                            <span id="reason-modal-count-badge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white">
+                                0 เคส
+                            </span>
+                            <span id="reason-modal-pct-badge" class="text-xs font-semibold text-slate-500">
+                                (0% ของงานปฏิเสธ)
+                            </span>
+                        </div>
+                        <h3 id="reason-modal-title" class="font-bold text-slate-900 text-base sm:text-lg mt-1 break-words">
+                            -
+                        </h3>
+                    </div>
+                </div>
+                <button id="btn-close-reason-modal" class="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 transition shrink-0" title="ปิดหน้าต่าง (Esc)">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Filter Bar: Team Pills & Search -->
+            <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 space-y-2.5 shrink-0">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="text-xs font-semibold text-slate-600 flex items-center">
+                        <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-blue-600"></i>
+                        <span>คลิกเลือกทีมช่างเพื่อกรองรายการ:</span>
+                    </div>
+                    <div class="relative w-full sm:w-64">
+                        <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-2 text-slate-400"></i>
+                        <input type="text" id="reason-modal-search" placeholder="ค้นหาชื่อลูกค้า, CCID, พื้นที่, หมายเหตุ..." class="w-full pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div id="reason-modal-teams-bar" class="flex flex-wrap items-center gap-1.5 max-h-24 overflow-y-auto">
+                    <!-- Team filter pills injected by JS -->
+                </div>
+            </div>
+
+            <!-- ModalBody: Reason Code Breakdown, Area Summary & Jobs Table -->
+            <div class="p-5 overflow-y-auto flex-1 space-y-3.5">
+                <!-- Reason Code Summary Pills (shown when viewing Rejects by Date/Month/Team) -->
+                <div class="flex flex-wrap items-center gap-1.5 text-xs hidden" id="reason-modal-reasons-bar">
+                    <!-- Injected by JS -->
+                </div>
+
+                <!-- Area / District Breakdown for this Reason -->
+                <div class="flex flex-wrap items-center gap-1.5 text-xs" id="reason-modal-area-summary">
+                    <!-- Injected by JS -->
+                </div>
+
+                <!-- Jobs Table -->
+                <div class="table-container border border-slate-200 bg-white rounded-xl">
+                    <table class="w-full text-left custom-table">
+                        <thead>
+                            <tr>
+                                <th class="w-12">#</th>
+                                <th class="min-w-[120px]">วัน-เวลานัดหมาย</th>
+                                <th class="min-w-[130px]">CCID / ประเภท</th>
+                                <th class="min-w-[180px]">ทีมช่างติดตั้ง</th>
+                                <th class="min-w-[180px]">ลูกค้า & เบอร์โทร</th>
+                                <th class="min-w-[100px]">สถานะ</th>
+                                <th class="min-w-[360px]">Reason Code / หมายเหตุ (Remark)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reason-modal-table-body">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
+                <span id="reason-modal-footer-summary" class="text-slate-500 font-medium">แสดง 0 รายการ</span>
+                <button onclick="closeReasonDetailModal()" class="px-4 py-1.5 rounded-xl font-semibold bg-slate-800 hover:bg-slate-900 text-white transition">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core App JS -->
+    <script src="/static/js/dashboard.js?v=3.7"></script>
+</body>
+</html>
